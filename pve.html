@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/vue@3"></script>
+    <title>PvE</title>
+    <style>
+        .red {
+            color: white;
+            background-color: red;
+        }
+        .green {
+            color: white;
+            background-color: green;
+        }
+        .black {
+            color: white;
+            background-color: black;
+        }
+        .blue {
+            color: white;
+            background-color: blue;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="screen">
+            <div>
+                <h1>Jogador</h1>
+                <progress id="vidaPlayer" :max="player.vida.max" :value="player.vida.atual" :class="
+                    (vidaPlayer > 20) ? 'green' : 'red'
+                "></progress>
+                <label for="vidaPlayer">{{vidaPlayer}}%</label>
+            </div>
+            <div>
+                <h1>Monstro</h1>
+                <progress id="vidaMonstro" :max="monstro.vida.max" :value="monstro.vida.atual" :class="
+                    ((monstro.vida.atual / monstro.vida.max) * 100 > 20) ? 'green' : 'red'
+                "></progress>
+                <label for="vidaMonstro">{{vidaMonstro}}%</label>
+            </div>
+        </div>
+        <div id="interface">
+            <template v-if="gameOver">
+                <button @click="iniciar()">Novo jogo</button>
+            </template>
+            <template v-else>
+                <button @click="acao('atacar')">Atacar</button>
+                <button @click="acao('curar')">Curar</button>
+                <button @click="finalizar()">Desistir</button>
+            </template>
+        </div>
+        <div id="log">
+            <template v-for="log in logs" :key="log._id">
+                <div :class="log.cor">{{log.msg}}</div>
+            </template>
+        </div>
+    </div>
+</body>
+<script>
+    const {createApp} = Vue;
+    createApp({
+        data() {
+            return {
+                player: {
+                    vida: {
+                        atual: 0,
+                        max: 100
+                    },
+                    dano: {
+                        min: 6,
+                        max: 10
+                    },
+                    cura: {
+                        min: 10,
+                        max: 15
+                    },
+                    crit: {
+                        chance: 0.10,
+                        multiplicador: 1.5
+                    },                    
+                },
+                monstro: {
+                    vida: {
+                        atual: 0, 
+                        max: 200
+                    },
+                    dano: {
+                        min: 8,
+                        max: 12
+                    }
+                },
+                logs: [],
+                gameOver: true
+            }
+        },
+        computed: {
+            vidaPlayer() {
+                const valor = (this.player.vida.atual / this.player.vida.max) * 100;
+                return valor > 0 ? Math.round(valor) : 0;
+
+            },
+            vidaMonstro() {
+                const valor = (this.monstro.vida.atual / this.monstro.vida.max) * 100;
+                return valor > 0 ? Math.round(valor) : 0;
+            }
+        },
+        methods: {
+            criarLog(aMsg, aCor) {
+                return {
+                    _id: this.logs.count > 0 ? this.logs.count + 1 : 1,
+                    msg: aMsg,
+                    cor: aCor
+                };
+            },
+            iniciar() {
+                this.player.vida.atual = this.player.vida.max;
+                this.monstro.vida.atual = this.monstro.vida.max;
+                this.logs = [];
+                this.gameOver = false;
+            },
+            finalizar() {
+                this.gameOver = true;
+                this.logs = [];
+            },
+            acao(acaoPlayer, acaoMonstro = 'atacar') {
+                switch (acaoPlayer) {
+                    case 'atacar':
+                        this.playerAtaca();
+                        break;
+                    case 'curar':
+                        this.playerCura();
+                        break;
+                }
+                switch (acaoMonstro) {
+                    case 'atacar':
+                        this.monstroAtaca()
+                        break;
+                }
+            },
+            playerAtaca() {
+                let danoCausado = Math.random() * (this.player.dano.max - this.player.dano.min) + this.player.dano.min;
+                let crit = false;
+                if (Math.random() <= this.player.crit.chance) {
+                    crit = true;
+                    danoCausado *= this.player.crit.multiplicador;
+                }
+                danoCausado = Math.round(danoCausado);
+
+                this.monstro.vida.atual -= danoCausado;
+                this.logs.unshift(this.criarLog('Player atacou o monstro e causou ' + danoCausado + ' de dano.' + (crit ? ' (acerto crítico)' : ''), 'blue'));
+            },
+            playerCura() {
+                let curaFeita = Math.random() * (this.player.cura.max - this.player.cura.min) + this.player.cura.min;
+                let crit = false;
+                if (Math.random() <= this.player.crit.chance) {
+                    crit = true;
+                    curaFeita *= this.player.crit.multiplicador;
+                }
+                curaFeita = Math.round(curaFeita);
+
+                this.player.vida.atual += curaFeita;
+                if (this.player.vida.atual > this.player.vida.max) 
+                    this.player.vida.atual = this.player.vida.max;
+
+                this.logs.unshift(this.criarLog('Player curou ' + curaFeita + ' de vida.' + (crit ? ' (cura crítica)' : ''), 'green'));
+            },
+            monstroAtaca() {
+                let danoCausado = Math.random() * (this.monstro.dano.max - this.monstro.dano.min) + this.monstro.dano.min;
+                danoCausado = Math.round(danoCausado);
+
+                this.player.vida.atual -= danoCausado;
+
+                this.logs.unshift(this.criarLog('Monstro atacou o player e causou ' + danoCausado + ' de dano.', 'red'));
+            }
+        },
+        watch: {
+            'player.vida.atual'(vida) {
+                if (!this.gameOver) {
+                    if (vida <= 0) {
+                        this.logs.unshift(this.criarLog('Player morreu!', 'black'));
+                        this.gameOver = true;
+                    }
+                }
+            },
+            'monstro.vida.atual'(vida) {
+                if (!this.gameOver) {
+                    if (vida <= 0) {
+                        this.logs.unshift(this.criarLog('Monstro morreu. Vitória!', 'green'));
+                        this.gameOver = true;
+                    }
+                }
+            }
+        }
+    }).mount('#app');
+</script>
+</html>
